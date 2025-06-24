@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Iniciar Sesión</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-image: url('/static/1.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+    </style>
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center vh-100">
+
+    <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
+        <h2 class="text-center mb-4">🧾 Punto de Venta</h2>
+        <h4 class="text-center mb-4">Iniciar Sesión</h4>
+
+        <form method="POST">
+            <div class="mb-3">
+                <label for="correo" class="form-label">Correo:</label>
+                <input type="text" class="form-control" name="correo" id="correo" required>
+            </div>
+            <div class="mb-3">
+                <label for="contrasena" class="form-label">Contraseña:</label>
+                <input type="password" class="form-control" name="contrasena" id="contrasena" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+        </form>
+
+        {% if error %}
+            <div class="alert alert-danger mt-3" role="alert">
+                {{ error }}
+            </div>
+        {% endif %}
+    </div>
+
+</body>
+<script>
+    const correoInput = document.getElementById("correo");
+    correoInput.addEventListener("blur", () => {
+        let valor = correoInput.value;
+        if (!valor.endsWith("@papeleria.com")) {
+            valor = valor.replace(/@.*$/, ''); // elimina cualquier dominio anterior
+            correoInput.value = valor + "@papeleria.com";
+        }
+    });
+</script>
+</html> 

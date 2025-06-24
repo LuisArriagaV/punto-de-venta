@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Punto de Venta</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            font-size: 18px;
+        }
+        .btn-lg {
+            font-size: 1.2rem;
+        }
+        .table td, .table th {
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🛒 Punto de Venta</h2>
+        <div class="d-flex gap-2">
+            
+            <a href="{{ url_for('inventario.inventario') }}" class="btn btn-outline-primary">📦 Ver inventario</a>
+            {% if rol == 'admin' %}
+            <a href="{{ url_for('auth.usuarios') }}" class="btn btn-outline-secondary">👤 Ver usuarios</a>
+
+            <a href="{{ url_for('auth.register') }}" class="btn btn-warning btn-lg">🧾 Registrar Usuario</a>
+            {% endif %}
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-lg">🔓 Cerrar sesión</a>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <strong>Usuario:</strong> {{ nombre_usuario }} <br>
+        <strong>Sucursal:</strong> {{ nombre_sucursal }}
+    </div> 
+
+    <form id="form-agregar" class="row g-3 mb-4">
+        <div class="col-md-6">
+            <label for="codigo_barras" class="form-label">Escanear Código de Barras</label>
+            <input type="text" class="form-control" id="codigo_barras" list="codigos_barras" placeholder="Escanea o escribe el código">
+            <datalist id="codigos_barras">
+                {% for prod in productos %}
+                <option value="{{ prod[3] }}">
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-md-6">
+            <label for="producto" class="form-label">Producto</label>
+            <input type="text" class="form-control" id="producto" list="lista_productos" placeholder="Escribe o selecciona un producto">
+            <datalist id="lista_productos">
+                {% for prod in productos %}
+                <option value="{{ prod[1] }}" data-id="{{ prod[0] }}" data-precio="{{ prod[2] }}" data-codigo="{{ prod[3] }}">
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-md-2">
+            <label for="cantidad" class="form-label">Cantidad</label>
+            <input type="number" class="form-control" id="cantidad" min="1" value="1">
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <button type="button" class="btn btn-primary btn-lg w-100" onclick="agregarProducto()">➕ Agregar</button>
+        </div>
+    </form>
+
+    <table class="table table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>#</th>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Subtotal</th>
+            </tr>
+        </thead>
+        <tbody id="tabla-ticket">
+            <!-- Aquí se agregan los productos con JS -->
+        </tbody>
+        <tfoot>
+            <tr>
+                <th colspan="4" class="text-end">Total:</th>
+                <th id="total">$0.00</th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="d-flex gap-3">
+        <button class="btn btn-success btn-lg w-50" onclick="registrarVenta()">💾 Registrar Venta</button>
+        <button class="btn btn-secondary btn-lg w-50" onclick="limpiarTicket()">🧹 Limpiar</button>
+    </div>
+    <button class="btn btn-info btn-lg w-100 mt-3" onclick="descargarVentasDelDia()">📥 Descargar Ventas del Día</button>
+
+    <script>
+    const registrarVentaURL = "{{ url_for('ventas.registrar_venta') }}";
+    const ventasDiaURL = "{{ url_for('ventas.ventas_del_dia') }}";
+        let ticket = [];
+        let contador = 1;
+
+        function agregarProducto() {
+            const codigoInput = document.getElementById("codigo_barras");
+            const productoInput = document.getElementById("producto");
+            const codigo = codigoInput.value.trim();
+            const productoNombre = productoInput.value.trim();
+
+            let id = "";
+            let nombre = "";
+            let precio = 0;
+
+            const opciones = document.querySelectorAll("#lista_productos option");
+            for (let opcion of opciones) {
+                if (codigo && opcion.dataset.codigo === codigo) {
+                    nombre = opcion.value;
+                    productoInput.value = opcion.value;
+                    id = opcion.dataset.id;
+                    precio = parseFloat(opcion.dataset.precio);
+                    break;
+                } else if (productoNombre && opcion.value === productoNombre) {
+                    codigoInput.value = opcion.dataset.codigo;
+                    nombre = opcion.value;
+                    id = opcion.dataset.id;
+                    precio = parseFloat(opcion.dataset.precio);
+                    break;
+                }
+            }
+
+            if (!id) {
+                alert("Producto no válido o no encontrado.");
+                return;
+            }
+
+            const cantidad = parseInt(document.getElementById("cantidad").value);
+            const subtotal = cantidad * precio;
+
+            ticket.push({ id, nombre, cantidad, precio, subtotal });
+
+            const fila = document.createElement("tr");
+            fila.innerHTML = `
+                <td>${contador++}</td>
+                <td>${nombre}</td>
+                <td>${cantidad}</td>
+                <td>$${precio.toFixed(2)}</td>
+                <td>$${subtotal.toFixed(2)}</td>
+            `;
+            document.getElementById("tabla-ticket").appendChild(fila);
+
+            actualizarTotal();
+
+            document.getElementById("producto").value = "";
+            document.getElementById("codigo_barras").value = "";
+            document.getElementById("cantidad").value = "1";
+        }
+
+        function actualizarTotal() {
+            const total = ticket.reduce((suma, item) => suma + item.subtotal, 0);
+            document.getElementById("total").innerText = `$${total.toFixed(2)}`;
+        }
+
+        function limpiarTicket() {
+            ticket = [];
+            contador = 1;
+            document.getElementById("tabla-ticket").innerHTML = "";
+            document.getElementById("total").innerText = "$0.00";
+        }
+
+        function registrarVenta() {
+            if (ticket.length === 0) {
+                alert("No hay productos en el ticket.");
+                return;
+            }
+
+            const data = {
+                productos: ticket
+            };
+
+            fetch(registrarVentaURL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert("Venta registrada con éxito.");
+                    limpiarTicket();
+                    descargarExcel(data.productos);
+                } else {
+                    alert("Error al registrar la venta.");
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Error de conexión.");
+            });
+        }
+    // Sincronizar al cambiar el código de barras
+    document.getElementById("codigo_barras").addEventListener("input", function () {
+        const codigo = this.value.trim();
+        const opciones = document.querySelectorAll("#lista_productos option");
+        for (let opcion of opciones) {
+            if (opcion.dataset.codigo === codigo) {
+                document.getElementById("producto").value = opcion.value;
+                break;
+            }
+        }
+    });
+
+    // Sincronizar al cambiar el nombre del producto
+    document.getElementById("producto").addEventListener("input", function () {
+        const nombre = this.value.trim();
+        const opciones = document.querySelectorAll("#lista_productos option");
+        for (let opcion of opciones) {
+            if (opcion.value === nombre) {
+                document.getElementById("codigo_barras").value = opcion.dataset.codigo;
+                break;
+            }
+        }
+    });
+        // Exportar la venta a archivo local .csv (Excel)
+        function descargarExcel(productos) {
+            let csv = "Producto,Cantidad,Precio,Subtotal\n";
+            productos.forEach(p => {
+                csv += `${p.nombre},${p.cantidad},${p.precio},${p.subtotal}\n`;
+            });
+
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+
+            link.setAttribute("href", url);
+            const fecha = new Date().toISOString().split("T")[0];
+            link.setAttribute("download", `venta_${fecha}.csv`);
+            link.style.visibility = "hidden";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+    <script>
+        // Función para descargar las ventas del día
+        function descargarVentasDelDia() {
+            fetch(ventasDiaURL)
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `ventas_dia_${new Date().toISOString().split("T")[0]}.xlsx`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                })
+                .catch(error => {
+                    console.error("Error al descargar ventas del día:", error);
+                    alert("No se pudo descargar el archivo de ventas del día.");
+                });
+        }
+    </script>
+</body>
+</html>

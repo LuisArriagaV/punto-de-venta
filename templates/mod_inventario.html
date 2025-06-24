@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Modificar Inventario</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<style>
+.modal.show {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+}
+.modal-backdrop.show {
+    pointer-events: auto !important;
+}
+</style>
+</head>
+<body class="p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>✏️ Modificar Inventario</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="mt-3 w-100">
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('inventario.inventario') }}" class="btn btn-secondary">← Volver a Inventario</a>
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-sm">🔓 Cerrar sesión</a>
+
+        </div>
+    </div>
+    
+    
+    <div class="mb-4 d-flex gap-3 align-items-center">
+        <form method="POST" action="{{ url_for('inventario.mod_inventario') }}" enctype="multipart/form-data" id="formImportar" class="d-flex gap-2 align-items-center">
+            <input type="hidden" name="accion" value="importar">
+            <input type="file" name="archivo" accept=".csv, .xlsx" id="archivoImportar" class="form-control form-control-sm" title="Debe contener: codigo_barras, nombre_sucursal, cantidad" required>
+            <button type="submit" class="btn btn-success btn-sm">📥 Importar</button>
+        </form>
+
+        <a href="{{ url_for('inventario.mod_inventario', accion='exportar') }}" class="btn btn-outline-primary btn-sm">📤 Exportar</a>
+    </div>
+
+    <div class="mb-4">
+        <h4>🔎 Buscar en el inventario</h4>
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Nombre o Código de Barras</label>
+                <input type="text" class="form-control" name="producto" id="inputProducto" placeholder="Nombre o código de barras">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">ID de la sucursal</label>
+                <input type="number" class="form-control" name="id_sucursal" id="inputSucursal" placeholder="Sucursal">
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-info btn-lg">🔍 Buscar</button>
+            </div>
+        </form>
+    </div>
+
+    <table class="table table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>Producto</th>
+                <th>Código de Barras</th>
+                <th>Sucursal</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Acciones</th>
+                <th>Transferencia</th>
+            </tr>
+        </thead>
+        <tbody id="tablaInventario">
+    {% for item in inventario %}
+    <tr>
+        <td>{{ item.nombre_producto }}</td>
+        <td>{{ item.codigo_barras }}</td>
+        <td>{{ item.nombre_sucursal }}</td>
+        <td>
+            <div class="input-group" style="max-width: 150px;">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cambiarCantidad(this, -1)">-</button>
+                <input type="number" class="form-control text-center" name="cantidad" value="{{ item.cantidad }}" min="0" required>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cambiarCantidad(this, 1)">+</button>
+            </div>
+        </td>
+        <td>
+            <div class="input-group" style="max-width: 150px;">
+                <span class="input-group-text">$</span>
+                <input type="number" step="0.01" class="form-control text-center" name="precio_unitario" form="form-{{ item.id_producto }}-{{ item.id_sucursal }}" value="{{ item.precio_unitario }}" min="0">
+            </div>
+        </td>
+        <td class="d-flex flex-column gap-1">
+            <form method="POST" action="{{ url_for('inventario.agregar_inventario') }}" id="form-{{ item.id_producto }}-{{ item.id_sucursal }}">
+                <input type="hidden" name="id_producto" value="{{ item.id_producto }}">
+                <input type="hidden" name="id_sucursal" value="{{ item.id_sucursal }}">
+                <div class="input-group mb-2" style="max-width: 150px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cambiarCantidad(this, -1)">-</button>
+                    <input type="number" class="form-control text-center" name="cantidad" value="{{ item.cantidad }}" min="0" required>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cambiarCantidad(this, 1)">+</button>
+                </div>
+                <button type="submit" class="btn btn-success btn-sm w-100">✅ Actualizar</button>
+            </form>
+
+            <a href="{{ url_for('inventario.eliminar_inventario', id_producto=item.id_producto, id_sucursal=item.id_sucursal) }}"
+               class="btn btn-outline-danger btn-sm w-100"
+               onclick="return confirm('¿Estás seguro de que quieres quitar este producto del inventario?');">
+               ❌ Quitar
+            </a>
+        </td>
+
+        <td>
+            <form method="POST" action="{{ url_for('inventario.transferir_inventario') }}" class="d-flex flex-column gap-1">
+                <input type="hidden" name="id_producto" value="{{ item.id_producto }}">
+                <input type="hidden" name="id_origen" value="{{ item.id_sucursal }}">
+
+                <label class="form-label mb-1 small">A sucursal:</label>
+                <select name="id_destino" class="form-select form-select-sm mb-1" required>
+                    <option value="" disabled selected>Seleccionar...</option>
+                    {% for sucursal in sucursales if sucursal.id != item.id_sucursal %}
+                    <option value="{{ sucursal.id }}">{{ sucursal.nombre }}</option>
+                    {% endfor %}
+                </select>
+
+                <label class="form-label mb-1 small">Cantidad:</label>
+                <input type="number" name="cantidad" class="form-control form-control-sm mb-1" placeholder="Cantidad" min="1" required>
+
+                <button type="submit" class="btn btn-outline-primary btn-sm w-100">🔁 Transferir</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</tbody>
+</table>
+
+
+
+<script>
+function cambiarCantidad(button, delta) {
+    const input = button.parentElement.querySelector('input[type="number"]');
+    let valor = parseInt(input.value);
+    valor += delta;
+    if (valor < 0) valor = 0;
+    input.value = valor;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const inputProducto = document.getElementById('inputProducto');
+    const inputSucursal = document.getElementById('inputSucursal');
+    const tabla = document.getElementById('tablaInventario');
+
+    function filtrarTabla() {
+        const productoVal = inputProducto.value.toLowerCase();
+        const sucursalVal = inputSucursal.value.trim();
+
+        for (const fila of tabla.rows) {
+            const nombreProducto = fila.cells[0].textContent.toLowerCase();
+            const codigoBarras = fila.cells[1].textContent.toLowerCase();
+            const sucursal = fila.cells[2].textContent.trim();
+
+            const coincideProducto = nombreProducto.includes(productoVal) || codigoBarras.includes(productoVal);
+            const coincideSucursal = !sucursalVal || sucursal === sucursalVal;
+
+            fila.style.display = (coincideProducto && coincideSucursal) ? '' : 'none';
+        }
+    }
+
+    inputProducto.addEventListener('input', filtrarTabla);
+    inputSucursal.addEventListener('input', filtrarTabla);
+});
+
+</script>
+
+
+</body>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</html>
